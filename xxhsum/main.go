@@ -2,7 +2,7 @@
 // Usage:
 // 	xxHash [-mode 0] [-seed 123] filename1 [filename2...]
 // where
-//  H: hash mode (0=32bits, 1=64bits) (default=1)
+//  mode: hash mode (0=32bits, 1=64bits) (default=1)
 //  seed: seed to be used (default=0)
 package main
 
