@@ -7,148 +7,90 @@ import (
 	"testing"
 )
 
-///////////////////////////////////////////////////////////////////////////////
-// Tests
-//
-// with small input multiple of 4
-func TestXXHSmallInput4(t *testing.T) {
-	var data = []byte("abcd")
+type test struct {
+	sum  uint64
+	data string
+}
 
-	var xxh = xxHash64.New(0)
-	xxh.Write(data)
+var testdata = []test{
+	{0xef46db3751d8e999, ""},
+	{0xd24ec4f1a98c6e5b, "a"},
+	{0x65f708ca92d04a61, "ab"},
+	{0x44bc2cf5ad770999, "abc"},
+	{0xde0327b0d25d92cc, "abcd"},
+	{0x07e3670c0c8dc7eb, "abcde"},
+	{0xfa8afd82c423144d, "abcdef"},
+	{0x1860940e2902822d, "abcdefg"},
+	{0x3ad351775b4634b7, "abcdefgh"},
+	{0x27f1a34fdbb95e13, "abcdefghi"},
+	{0xd6287a1de5498bb2, "abcdefghij"},
+	{0xbf2cd639b4143b80, "abcdefghijklmnopqrstuvwxyz012345"},
+	{0x64f23ecf1609b766, "abcdefghijklmnopqrstuvwxyz0123456789"},
+	{0xc5a8b11443765630, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+}
 
-	expected := uint64(0xde0327b0d25d92cc)
-	if h := xxh.Sum64(); h != expected {
-		t.Errorf("TestXXHSmallInput4: %x", h)
-	}
-	if h := xxHash64.Checksum(data, 0); h != expected {
-		t.Errorf("TestXXHSmallInput4: %x", h)
+func TestBlockSize(t *testing.T) {
+	xxh := xxHash64.New(0)
+	if s := xxh.BlockSize(); s <= 0 {
+		t.Errorf("invalid BlockSize: %d", s)
 	}
 }
 
-// with medium input multiple of 4
-func TestXXHMediumInput4(t *testing.T) {
-	var dataSample = []byte("abcd")
-	var data []byte
-
-	for i := 0; i < 1000; i++ {
-		data = append(data, dataSample...)
-	}
-	var xxh = xxHash64.New(0)
-	xxh.Write(data)
-
-	expected := uint64(0x205219d38e8898bc)
-	if h := xxh.Sum64(); h != expected {
-		t.Errorf("TestXXHSmallInput4: %x", h)
-	}
-	if h := xxHash64.Checksum(data, 0); h != expected {
-		t.Errorf("TestXXHSmallInput4: %x", h)
+func TestSize(t *testing.T) {
+	xxh := xxHash64.New(0)
+	if s := xxh.Size(); s != 8 {
+		t.Errorf("invalid Size: got %d expected 8", s)
 	}
 }
 
-// with small input
-func TestXXHSmallInput(t *testing.T) {
-	var data = []byte("abc")
-
-	var xxh = xxHash64.New(0)
-	xxh.Write(data)
-
-	expected := uint64(0x44bc2cf5ad770999)
-	if h := xxh.Sum64(); h != expected {
-		t.Errorf("TestXXHSmallInput: %x", h)
-	}
-	if h := xxHash64.Checksum(data, 0); h != expected {
-		t.Errorf("TestXXHSmallInput: %x", h)
-	}
-}
-
-// with medium input
-func TestXXHMediumInput(t *testing.T) {
-	var dataSample = []byte("abc")
-	var data []byte
-
-	for i := 0; i < 999; i++ {
-		data = append(data, dataSample...)
-	}
-	var xxh = xxHash64.New(0)
-	xxh.Write(data)
-
-	expected := uint64(0x933eb85613976467)
-	if h := xxh.Sum64(); h != expected {
-		t.Errorf("TestXXHMediumInput: %x", h)
-	}
-	if h := xxHash64.Checksum(data, 0); h != expected {
-		t.Errorf("TestXXHMediumInput: %x", h)
+func TestData(t *testing.T) {
+	for i, td := range testdata {
+		xxh := xxHash64.New(0)
+		data := []byte(td.data)
+		xxh.Write(data)
+		if h := xxh.Sum64(); h != td.sum {
+			t.Errorf("test %d: xxh64(%s)=0x%x expected 0x%x", i, td.data[:40], h, td.sum)
+			t.FailNow()
+		}
+		if h := xxHash64.Checksum(data, 0); h != td.sum {
+			t.Errorf("test %d: xxh64(%s)=0x%x expected 0x%x", i, td.data[:40], h, td.sum)
+			t.FailNow()
+		}
 	}
 }
 
-// with split medium input <32
-func TestXXHSplitMediumInputLt32(t *testing.T) {
-	var dataSample = []byte("abc")
-	var data []byte
-
-	for i := 0; i < 999; i++ {
-		data = append(data, dataSample...)
-	}
-	var xxh = xxHash64.New(0)
-	xxh.Write(data[0:20])
-	xxh.Write(data[20:])
-
-	expected := uint64(0x933eb85613976467)
-	if h := xxh.Sum64(); h != expected {
-		t.Errorf("TestXXHSplitMediumInputLt32: %x", h)
-	}
-	if h := xxHash64.Checksum(data, 0); h != expected {
-		t.Errorf("TestXXHSplitMediumInputLt32: %x", h)
+func TestSplitData(t *testing.T) {
+	for i, td := range testdata {
+		xxh := xxHash64.New(0)
+		data := []byte(td.data)
+		l := len(data) / 2
+		xxh.Write(data[0:l])
+		xxh.Write(data[l:])
+		h := xxh.Sum64()
+		if h != td.sum {
+			t.Errorf("test %d: xxh64(%s)=0x%x expected 0x%x", i, td.data[:40], h, td.sum)
+			t.FailNow()
+		}
 	}
 }
 
-// with split medium input ==32
-func TestXXHSplitMediumInputEq32(t *testing.T) {
-	var dataSample = []byte("abc")
-	var data []byte
-
-	for i := 0; i < 999; i++ {
-		data = append(data, dataSample...)
-	}
-	var xxh = xxHash64.New(0)
-	xxh.Write(data[0:32])
-	xxh.Write(data[32:])
-
-	expected := uint64(0x933eb85613976467)
-	if h := xxh.Sum64(); h != expected {
-		t.Errorf("TestXXHSplitMediumInputEq32: %x", h)
-	}
-	if h := xxHash64.Checksum(data, 0); h != expected {
-		t.Errorf("TestXXHSplitMediumInputEq32: %x", h)
-	}
-}
-
-// with split medium input >32
-func TestXXHSplitMediumInputGt32(t *testing.T) {
-	var dataSample = []byte("abc")
-	var data []byte
-
-	for i := 0; i < 999; i++ {
-		data = append(data, dataSample...)
-	}
-	var xxh = xxHash64.New(0)
-	xxh.Write(data[0:40])
-	xxh.Write(data[40:])
-
-	expected := uint64(0x933eb85613976467)
-	if h := xxh.Sum64(); h != expected {
-		t.Errorf("TestXXHSplitMediumInputGt32: %x", h)
-	}
-	if h := xxHash64.Checksum(data, 0); h != expected {
-		t.Errorf("TestXXHSplitMediumInputGt32: %x", h)
+func TestReset(t *testing.T) {
+	xxh := xxHash64.New(0)
+	for i, td := range testdata {
+		xxh.Write([]byte(td.data))
+		h := xxh.Sum64()
+		if h != td.sum {
+			t.Errorf("test %d: xxh64(%s)=0x%x expected 0x%x", i, td.data[:40], h, td.sum)
+			t.FailNow()
+		}
+		xxh.Reset()
 	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Benchmarks
 //
-var testdata1 = []byte("Lorem ipsum dolor sit amet, consectetuer adipiscing elit, ")
+var testdata1 = []byte(testdata[len(testdata)-1].data)
 
 func Benchmark_XXH64(b *testing.B) {
 	h := xxHash64.New(0)
