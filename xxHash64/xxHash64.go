@@ -36,7 +36,7 @@ func New(seed uint64) hash.Hash64 {
 // It does not change the underlying hash state.
 func (xxh xxHash) Sum(b []byte) []byte {
 	h64 := xxh.Sum64()
-	return append(b, byte(h64>>56), byte(h64>>48), byte(h64>>40), byte(h64>>32), byte(h64>>24), byte(h64>>16), byte(h64>>8), byte(h64))
+	return append(b, byte(h64), byte(h64>>8), byte(h64>>16), byte(h64>>24), byte(h64>>32), byte(h64>>40), byte(h64>>48), byte(h64>>56))
 }
 
 // Reset resets the Hash to its initial state.
