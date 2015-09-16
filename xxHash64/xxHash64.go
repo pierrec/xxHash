@@ -171,7 +171,78 @@ func (xxh *xxHash) Sum64() uint64 {
 
 // Checksum returns the 64bits Hash value.
 func Checksum(input []byte, seed uint64) uint64 {
-	x := New(seed)
-	x.Write(input)
-	return x.Sum64()
+	n := len(input)
+	var h64 uint64
+
+	if n >= 32 {
+		v1 := seed + prime64_1 + prime64_2
+		v2 := seed + prime64_2
+		v3 := seed
+		v4 := seed - prime64_1
+		p := 0
+		for n := n - 32; p <= n; {
+			p64 := v1 + (uint64(input[p+7])<<56|uint64(input[p+6])<<48|uint64(input[p+5])<<40|uint64(input[p+4])<<32|uint64(input[p+3])<<24|uint64(input[p+2])<<16|uint64(input[p+1])<<8|uint64(input[p]))*prime64_2
+			v1 = (p64<<31 | p64>>33) * prime64_1
+			p += 8
+			p64 = v2 + (uint64(input[p+7])<<56|uint64(input[p+6])<<48|uint64(input[p+5])<<40|uint64(input[p+4])<<32|uint64(input[p+3])<<24|uint64(input[p+2])<<16|uint64(input[p+1])<<8|uint64(input[p]))*prime64_2
+			v2 = (p64<<31 | p64>>33) * prime64_1
+			p += 8
+			p64 = v3 + (uint64(input[p+7])<<56|uint64(input[p+6])<<48|uint64(input[p+5])<<40|uint64(input[p+4])<<32|uint64(input[p+3])<<24|uint64(input[p+2])<<16|uint64(input[p+1])<<8|uint64(input[p]))*prime64_2
+			v3 = (p64<<31 | p64>>33) * prime64_1
+			p += 8
+			p64 = v4 + (uint64(input[p+7])<<56|uint64(input[p+6])<<48|uint64(input[p+5])<<40|uint64(input[p+4])<<32|uint64(input[p+3])<<24|uint64(input[p+2])<<16|uint64(input[p+1])<<8|uint64(input[p]))*prime64_2
+			v4 = (p64<<31 | p64>>33) * prime64_1
+			p += 8
+		}
+
+		h64 = ((v1 << 1) | (v1 >> 63)) +
+			((v2 << 7) | (v2 >> 57)) +
+			((v3 << 12) | (v3 >> 52)) +
+			((v4 << 18) | (v4 >> 46))
+
+		v1 *= prime64_2
+		h64 ^= ((v1 << 31) | (v1 >> 33)) * prime64_1
+		h64 = h64*prime64_1 + prime64_4
+
+		v2 *= prime64_2
+		h64 ^= ((v2 << 31) | (v2 >> 33)) * prime64_1
+		h64 = h64*prime64_1 + prime64_4
+
+		v3 *= prime64_2
+		h64 ^= ((v3 << 31) | (v3 >> 33)) * prime64_1
+		h64 = h64*prime64_1 + prime64_4
+
+		v4 *= prime64_2
+		h64 ^= ((v4 << 31) | (v4 >> 33)) * prime64_1
+		h64 = h64*prime64_1 + prime64_4 + uint64(n)
+
+		input = input[p:]
+		n -= p
+	} else {
+		h64 = seed + prime64_5 + uint64(n)
+	}
+
+	p := 0
+	for n := n - 8; p <= n; p += 8 {
+		p64 := (uint64(input[p+7])<<56 | uint64(input[p+6])<<48 | uint64(input[p+5])<<40 | uint64(input[p+4])<<32 | uint64(input[p+3])<<24 | uint64(input[p+2])<<16 | uint64(input[p+1])<<8 | uint64(input[p])) * prime64_2
+		h64 ^= ((p64 << 31) | (p64 >> 33)) * prime64_1
+		h64 = ((h64<<27)|(h64>>37))*prime64_1 + prime64_4
+	}
+	if p+4 <= n {
+		h64 ^= (uint64(input[p+3])<<24 | uint64(input[p+2])<<16 | uint64(input[p+1])<<8 | uint64(input[p])) * prime64_1
+		h64 = ((h64<<23)|(h64>>41))*prime64_2 + prime64_3
+		p += 4
+	}
+	for ; p < n; p++ {
+		h64 ^= uint64(input[p]) * prime64_5
+		h64 = ((h64 << 11) | (h64 >> 53)) * prime64_1
+	}
+
+	h64 ^= h64 >> 33
+	h64 *= prime64_2
+	h64 ^= h64 >> 29
+	h64 *= prime64_3
+	h64 ^= h64 >> 32
+
+	return h64
 }
