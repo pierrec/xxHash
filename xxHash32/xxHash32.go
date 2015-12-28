@@ -19,15 +19,13 @@ type xxHash struct {
 	v3       uint32
 	v4       uint32
 	totalLen uint64
-	buf      []byte
+	buf      [16]byte
+	bufused  int
 }
 
 // New returns a new Hash32 instance.
 func New(seed uint32) hash.Hash32 {
-	xxh := &xxHash{
-		seed: seed,
-		buf:  make([]byte, 0, 16),
-	}
+	xxh := &xxHash{seed: seed}
 	xxh.Reset()
 	return xxh
 }
@@ -46,7 +44,7 @@ func (xxh *xxHash) Reset() {
 	xxh.v3 = xxh.seed
 	xxh.v4 = xxh.seed - prime32_1
 	xxh.totalLen = 0
-	xxh.buf = xxh.buf[:0]
+	xxh.bufused = 0
 }
 
 // Size returns the number of bytes returned by Sum().
@@ -63,20 +61,22 @@ func (xxh *xxHash) BlockSize() int {
 // It never returns an error.
 func (xxh *xxHash) Write(input []byte) (int, error) {
 	n := len(input)
-	m := len(xxh.buf)
+	m := xxh.bufused
 
 	xxh.totalLen += uint64(n)
 
-	r := 16 - m
+	r := len(xxh.buf) - m
 	if n < r {
-		xxh.buf = append(xxh.buf, input...)
+		copy(xxh.buf[m:], input)
+		xxh.bufused += len(input)
 		return n, nil
 	}
 
 	p := 0
 	if m > 0 {
 		// some data left from previous update
-		xxh.buf = append(xxh.buf, input[:r]...)
+		copy(xxh.buf[xxh.bufused:], input[:r])
+		xxh.bufused += len(input) - r
 
 		// fast rotl(13)
 		p32 := xxh.v1 + (uint32(xxh.buf[p+3])<<24|uint32(xxh.buf[p+2])<<16|uint32(xxh.buf[p+1])<<8|uint32(xxh.buf[p]))*prime32_2
@@ -92,7 +92,7 @@ func (xxh *xxHash) Write(input []byte) (int, error) {
 		xxh.v4 = (p32<<13 | p32>>19) * prime32_1
 
 		p = r
-		xxh.buf = xxh.buf[:0]
+		xxh.bufused = 0
 	}
 
 	for n := n - 16; p <= n; {
@@ -110,7 +110,8 @@ func (xxh *xxHash) Write(input []byte) (int, error) {
 		p += 4
 	}
 
-	xxh.buf = append(xxh.buf, input[p:]...)
+	copy(xxh.buf[xxh.bufused:], input[p:])
+	xxh.bufused += len(input) - p
 
 	return n, nil
 }
@@ -128,7 +129,7 @@ func (xxh *xxHash) Sum32() uint32 {
 	}
 
 	p := 0
-	n := len(xxh.buf)
+	n := xxh.bufused
 	for n := n - 4; p <= n; p += 4 {
 		h32 += (uint32(xxh.buf[p+3])<<24 | uint32(xxh.buf[p+2])<<16 | uint32(xxh.buf[p+1])<<8 | uint32(xxh.buf[p])) * prime32_3
 		h32 = ((h32 << 17) | (h32 >> 15)) * prime32_4
