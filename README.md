@@ -14,8 +14,11 @@ This package implements xxHash in pure [Go](http://www.golang.com).
 This package follows the hash interfaces (hash.Hash32 and hash.Hash64).
 
 ```go
-	import "fmt"
-	import "github.com/pierrec/xxHash/xxHash32"
+	import (
+		"fmt"
+
+		"github.com/pierrec/xxHash/xxHash32"
+	)
 
  	x := xxHash32.New(0xCAFE) // hash.Hash32
 	x.Write([]byte("abc"))
