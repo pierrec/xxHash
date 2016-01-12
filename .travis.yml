@@ -5,5 +5,7 @@ go:
   - 1.5
 
 script: 
- - go test -cpu=2
- - go test -cpu=2 -race
+ - go test -cpu=2 github.com/pierrec/xxHash/xxHash32
+ - go test -cpu=2 github.com/pierrec/xxHash/xxHash64
+ - go test -cpu=2 -race github.com/pierrec/xxHash/xxHash32
+ - go test -cpu=2 -race github.com/pierrec/xxHash/xxHash64
