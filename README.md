@@ -1,3 +1,6 @@
+[![godoc](https://godoc.org/github.com/pierrec/xxHash?status.png)](https://godoc.org/github.com/pierrec/xxHash)
+[![Build Status](https://travis-ci.org/pierrec/xxHash.svg?branch=master)](https://travis-ci.org/pierrec/xxHash)
+
 # Pure Go implementation of xxHash (32 and 64 bits versions)
 
 ## Synopsis
