@@ -9,11 +9,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/pierrec/xxHash/xxHash32"
-	"github.com/pierrec/xxHash/xxHash64"
 	"hash"
 	"io"
 	"os"
+
+	"github.com/pierrec/xxHash/xxHash32"
+	"github.com/pierrec/xxHash/xxHash64"
 )
 
 func main() {
