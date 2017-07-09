@@ -15,18 +15,6 @@ const (
 	prime64_5 = 2870177450012600261
 )
 
-var littleEndian bool
-
-func init() {
-	b := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
-	actual := *(*uint64)(unsafe.Pointer(&b[0]))
-	expected := uint64(0)
-	for i, v := range b {
-		expected += uint64(v) << (uint(i) * 8)
-	}
-	littleEndian = actual == expected
-}
-
 type xxHash struct {
 	seed     uint64
 	v1       uint64
@@ -94,59 +82,33 @@ func (xxh *xxHash) Write(input []byte) (int, error) {
 		xxh.bufused += len(input) - r
 
 		// fast rotl(31)
-		if littleEndian {
-			ptr := uintptr(unsafe.Pointer(&xxh.buf[p]))
-			p64 := xxh.v1 + *(*uint64)(unsafe.Pointer(ptr))*prime64_2
-			xxh.v1 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v2 + *(*uint64)(unsafe.Pointer(ptr + 8))*prime64_2
-			xxh.v2 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v3 + *(*uint64)(unsafe.Pointer(ptr + 16))*prime64_2
-			xxh.v3 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v4 + *(*uint64)(unsafe.Pointer(ptr + 24))*prime64_2
-			xxh.v4 = (p64<<31 | p64>>33) * prime64_1
-		} else {
-			p64 := xxh.v1 + (uint64(xxh.buf[0+7])<<56|uint64(xxh.buf[0+6])<<48|uint64(xxh.buf[0+5])<<40|uint64(xxh.buf[0+4])<<32|uint64(xxh.buf[0+3])<<24|uint64(xxh.buf[0+2])<<16|uint64(xxh.buf[0+1])<<8|uint64(xxh.buf[0]))*prime64_2
-			xxh.v1 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v2 + (uint64(xxh.buf[8+7])<<56|uint64(xxh.buf[8+6])<<48|uint64(xxh.buf[8+5])<<40|uint64(xxh.buf[8+4])<<32|uint64(xxh.buf[8+3])<<24|uint64(xxh.buf[8+2])<<16|uint64(xxh.buf[8+1])<<8|uint64(xxh.buf[8]))*prime64_2
-			xxh.v2 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v3 + (uint64(xxh.buf[16+7])<<56|uint64(xxh.buf[16+6])<<48|uint64(xxh.buf[16+5])<<40|uint64(xxh.buf[16+4])<<32|uint64(xxh.buf[16+3])<<24|uint64(xxh.buf[16+2])<<16|uint64(xxh.buf[16+1])<<8|uint64(xxh.buf[16]))*prime64_2
-			xxh.v3 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v4 + (uint64(xxh.buf[24+7])<<56|uint64(xxh.buf[24+6])<<48|uint64(xxh.buf[24+5])<<40|uint64(xxh.buf[24+4])<<32|uint64(xxh.buf[24+3])<<24|uint64(xxh.buf[24+2])<<16|uint64(xxh.buf[24+1])<<8|uint64(xxh.buf[24]))*prime64_2
-			xxh.v4 = (p64<<31 | p64>>33) * prime64_1
-		}
+		p64 := xxh.v1 + u64(xxh.buf[:])*prime64_2
+		xxh.v1 = (p64<<31 | p64>>33) * prime64_1
+		p64 = xxh.v2 + u64(xxh.buf[8:])*prime64_2
+		xxh.v2 = (p64<<31 | p64>>33) * prime64_1
+		p64 = xxh.v3 + u64(xxh.buf[16:])*prime64_2
+		xxh.v3 = (p64<<31 | p64>>33) * prime64_1
+		p64 = xxh.v4 + u64(xxh.buf[24:])*prime64_2
+		xxh.v4 = (p64<<31 | p64>>33) * prime64_1
 		p = r
 		xxh.bufused = 0
 	}
 
 	if p > n-32 {
 		// Nothing to do
-	} else if littleEndian {
+	} else {
 		ptr := uintptr(unsafe.Pointer(&input[p]))
 		for n := n - 32; p <= n; p += 32 {
-			p64 := xxh.v1 + *(*uint64)(unsafe.Pointer(ptr))*prime64_2
+			sub := (*[32]byte)(unsafe.Pointer(ptr))
+			p64 := xxh.v1 + u64(sub[:])*prime64_2
 			xxh.v1 = (p64<<31 | p64>>33) * prime64_1
-			ptr += 8
-			p64 = xxh.v2 + *(*uint64)(unsafe.Pointer(ptr))*prime64_2
+			p64 = xxh.v2 + u64(sub[8:])*prime64_2
 			xxh.v2 = (p64<<31 | p64>>33) * prime64_1
-			ptr += 8
-			p64 = xxh.v3 + *(*uint64)(unsafe.Pointer(ptr))*prime64_2
+			p64 = xxh.v3 + u64(sub[16:])*prime64_2
 			xxh.v3 = (p64<<31 | p64>>33) * prime64_1
-			ptr += 8
-			p64 = xxh.v4 + *(*uint64)(unsafe.Pointer(ptr))*prime64_2
+			p64 = xxh.v4 + u64(sub[24:])*prime64_2
 			xxh.v4 = (p64<<31 | p64>>33) * prime64_1
-			ptr += 8
-		}
-	} else {
-		for n := n - 32; p <= n; p += 32 {
-			sub := input[p : p+32]
-			p64 := xxh.v1 + (uint64(sub[0+7])<<56|uint64(sub[0+6])<<48|uint64(sub[0+5])<<40|uint64(sub[0+4])<<32|uint64(sub[0+3])<<24|uint64(sub[0+2])<<16|uint64(sub[0+1])<<8|uint64(sub[0]))*prime64_2
-			xxh.v1 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v2 + (uint64(sub[8+7])<<56|uint64(sub[8+6])<<48|uint64(sub[8+5])<<40|uint64(sub[8+4])<<32|uint64(sub[8+3])<<24|uint64(sub[8+2])<<16|uint64(sub[8+1])<<8|uint64(sub[8]))*prime64_2
-			xxh.v2 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v3 + (uint64(sub[16+7])<<56|uint64(sub[16+6])<<48|uint64(sub[16+5])<<40|uint64(sub[16+4])<<32|uint64(sub[16+3])<<24|uint64(sub[16+2])<<16|uint64(sub[16+1])<<8|uint64(sub[16]))*prime64_2
-			xxh.v3 = (p64<<31 | p64>>33) * prime64_1
-			p64 = xxh.v4 + (uint64(sub[24+7])<<56|uint64(sub[24+6])<<48|uint64(sub[24+5])<<40|uint64(sub[24+4])<<32|uint64(sub[24+3])<<24|uint64(sub[24+2])<<16|uint64(sub[24+1])<<8|uint64(sub[24]))*prime64_2
-			xxh.v4 = (p64<<31 | p64>>33) * prime64_1
+			ptr += 32
 		}
 	}
 
@@ -183,44 +145,22 @@ func (xxh *xxHash) Sum64() uint64 {
 	} else {
 		h64 = xxh.seed + prime64_5 + xxh.totalLen
 	}
-	if littleEndian {
-		p := 0
-		n := xxh.bufused
-		ptr := uintptr(unsafe.Pointer(&xxh.buf[0]))
-		for n := n - 8; p <= n; p += 8 {
-			p64 := *(*uint64)(unsafe.Pointer(ptr)) * prime64_2
-			h64 ^= ((p64 << 31) | (p64 >> 33)) * prime64_1
-			h64 = ((h64<<27)|(h64>>37))*prime64_1 + prime64_4
-			ptr += 8
-		}
-		if p+4 <= n {
-			p32 := *(*uint32)(unsafe.Pointer(ptr))
-			h64 ^= uint64(p32) * prime64_1
-			h64 = ((h64<<23)|(h64>>41))*prime64_2 + prime64_3
-			p += 4
-			ptr += 4
-		}
-		for ; p < n; p++ {
-			h64 ^= uint64(xxh.buf[p]) * prime64_5
-			h64 = ((h64 << 11) | (h64 >> 53)) * prime64_1
-		}
-	} else {
-		p := 0
-		n := xxh.bufused
-		for n := n - 8; p <= n; p += 8 {
-			p64 := (uint64(xxh.buf[p+7])<<56 | uint64(xxh.buf[p+6])<<48 | uint64(xxh.buf[p+5])<<40 | uint64(xxh.buf[p+4])<<32 | uint64(xxh.buf[p+3])<<24 | uint64(xxh.buf[p+2])<<16 | uint64(xxh.buf[p+1])<<8 | uint64(xxh.buf[p])) * prime64_2
-			h64 ^= ((p64 << 31) | (p64 >> 33)) * prime64_1
-			h64 = ((h64<<27)|(h64>>37))*prime64_1 + prime64_4
-		}
-		if p+4 <= n {
-			h64 ^= (uint64(xxh.buf[p+3])<<24 | uint64(xxh.buf[p+2])<<16 | uint64(xxh.buf[p+1])<<8 | uint64(xxh.buf[p])) * prime64_1
-			h64 = ((h64<<23)|(h64>>41))*prime64_2 + prime64_3
-			p += 4
-		}
-		for ; p < n; p++ {
-			h64 ^= uint64(xxh.buf[p]) * prime64_5
-			h64 = ((h64 << 11) | (h64 >> 53)) * prime64_1
-		}
+	p := 0
+	n := xxh.bufused
+	for n := n - 8; p <= n; p += 8 {
+		p64 := u64(xxh.buf[p:p+8]) * prime64_2
+		h64 ^= ((p64 << 31) | (p64 >> 33)) * prime64_1
+		h64 = ((h64<<27)|(h64>>37))*prime64_1 + prime64_4
+	}
+	if p+4 <= n {
+		sub := xxh.buf[p : p+4]
+		h64 ^= (uint64(sub[0]) | uint64(sub[1])<<8 | uint64(sub[2])<<16 | uint64(sub[3])<<24) * prime64_1
+		h64 = ((h64<<23)|(h64>>41))*prime64_2 + prime64_3
+		p += 4
+	}
+	for ; p < n; p++ {
+		h64 ^= uint64(xxh.buf[p]) * prime64_5
+		h64 = ((h64 << 11) | (h64 >> 53)) * prime64_1
 	}
 
 	h64 ^= h64 >> 33
@@ -245,33 +185,19 @@ func Checksum(input []byte, seed uint64) uint64 {
 		p := 0
 		if n < 32 {
 			// Nothing to do
-		} else if littleEndian {
-			ptr := uintptr(unsafe.Pointer(&input[0]))
-			for n := n - 32; p <= n; p += 32 {
-				v1 += *(*uint64)(unsafe.Pointer(ptr)) * prime64_2
-				v1 = (v1<<31 | v1>>33) * prime64_1
-				ptr += 8
-				v2 += *(*uint64)(unsafe.Pointer(ptr)) * prime64_2
-				v2 = (v2<<31 | v2>>33) * prime64_1
-				ptr += 8
-				v3 += *(*uint64)(unsafe.Pointer(ptr)) * prime64_2
-				v3 = (v3<<31 | v3>>33) * prime64_1
-				ptr += 8
-				v4 += *(*uint64)(unsafe.Pointer(ptr)) * prime64_2
-				v4 = (v4<<31 | v4>>33) * prime64_1
-				ptr += 8
-			}
 		} else {
+			ptr := uintptr(unsafe.Pointer(&input[p]))
 			for n := n - 32; p <= n; p += 32 {
-				sub := input[p : p+32]
-				p64 := v1 + (uint64(sub[0+7])<<56|uint64(sub[0+6])<<48|uint64(sub[0+5])<<40|uint64(sub[0+4])<<32|uint64(sub[0+3])<<24|uint64(sub[0+2])<<16|uint64(sub[0+1])<<8|uint64(sub[0]))*prime64_2
+				sub := (*[32]byte)(unsafe.Pointer(ptr))
+				p64 := v1 + u64(sub[:])*prime64_2
 				v1 = (p64<<31 | p64>>33) * prime64_1
-				p64 = v2 + (uint64(sub[8+7])<<56|uint64(sub[8+6])<<48|uint64(sub[8+5])<<40|uint64(sub[8+4])<<32|uint64(sub[8+3])<<24|uint64(sub[8+2])<<16|uint64(sub[8+1])<<8|uint64(sub[8]))*prime64_2
+				p64 = v2 + u64(sub[8:])*prime64_2
 				v2 = (p64<<31 | p64>>33) * prime64_1
-				p64 = v3 + (uint64(sub[16+7])<<56|uint64(sub[16+6])<<48|uint64(sub[16+5])<<40|uint64(sub[16+4])<<32|uint64(sub[16+3])<<24|uint64(sub[16+2])<<16|uint64(sub[16+1])<<8|uint64(sub[16]))*prime64_2
+				p64 = v3 + u64(sub[16:])*prime64_2
 				v3 = (p64<<31 | p64>>33) * prime64_1
-				p64 = v4 + (uint64(sub[24+7])<<56|uint64(sub[24+6])<<48|uint64(sub[24+5])<<40|uint64(sub[24+4])<<32|uint64(sub[24+3])<<24|uint64(sub[24+2])<<16|uint64(sub[24+1])<<8|uint64(sub[24]))*prime64_2
+				p64 = v4 + u64(sub[24:])*prime64_2
 				v4 = (p64<<31 | p64>>33) * prime64_1
+				ptr += 32
 			}
 		}
 
@@ -304,31 +230,11 @@ func Checksum(input []byte, seed uint64) uint64 {
 
 	if n == 0 {
 		// Nothing to do
-	} else if littleEndian {
-		p := 0
-		ptr := uintptr(unsafe.Pointer(&input[0]))
-		for n := n - 8; p <= n; p += 8 {
-			p64 := *(*uint64)(unsafe.Pointer(ptr)) * prime64_2
-			h64 ^= ((p64 << 31) | (p64 >> 33)) * prime64_1
-			h64 = ((h64<<27)|(h64>>37))*prime64_1 + prime64_4
-			ptr += 8
-		}
-		if p+4 <= n {
-			p32 := *(*uint32)(unsafe.Pointer(ptr))
-			h64 ^= uint64(p32) * prime64_1
-			h64 = ((h64<<23)|(h64>>41))*prime64_2 + prime64_3
-			p += 4
-			ptr += 4
-		}
-		for ; p < n; p++ {
-			h64 ^= uint64(input[p]) * prime64_5
-			h64 = ((h64 << 11) | (h64 >> 53)) * prime64_1
-		}
 	} else {
 		p := 0
 		for n := n - 8; p <= n; p += 8 {
 			sub := input[p : p+8]
-			p64 := (uint64(sub[7])<<56 | uint64(sub[6])<<48 | uint64(sub[5])<<40 | uint64(sub[4])<<32 | uint64(sub[3])<<24 | uint64(sub[2])<<16 | uint64(sub[1])<<8 | uint64(sub[0])) * prime64_2
+			p64 := u64(sub) * prime64_2
 			h64 ^= ((p64 << 31) | (p64 >> 33)) * prime64_1
 			h64 = ((h64<<27)|(h64>>37))*prime64_1 + prime64_4
 		}
@@ -351,4 +257,9 @@ func Checksum(input []byte, seed uint64) uint64 {
 	h64 ^= h64 >> 32
 
 	return h64
+}
+
+func u64(buf []byte) uint64 {
+	// go compiler recognizes this pattern and optimizes it on little endian platforms
+	return uint64(buf[0]) | uint64(buf[1])<<8 | uint64(buf[2])<<16 | uint64(buf[3])<<24 | uint64(buf[4])<<32 | uint64(buf[5])<<40 | uint64(buf[6])<<48 | uint64(buf[7])<<56
 }
