@@ -2,7 +2,10 @@
 // (https://github.com/Cyan4973/xxHash/)
 package xxHash32
 
-import "hash"
+import (
+	"hash"
+	"unsafe"
+)
 
 const (
 	prime32_1 = 2654435761
@@ -11,6 +14,18 @@ const (
 	prime32_4 = 668265263
 	prime32_5 = 374761393
 )
+
+var littleEndian bool
+
+func init() {
+	b := [4]byte{1, 2, 3, 4}
+	actual := *(*uint32)(unsafe.Pointer(&b[0]))
+	expected := uint32(0)
+	for i, v := range b {
+		expected += uint32(v) << (uint(i) * 8)
+	}
+	littleEndian = actual == expected
+}
 
 type xxHash struct {
 	seed     uint32
@@ -79,35 +94,60 @@ func (xxh *xxHash) Write(input []byte) (int, error) {
 		xxh.bufused += len(input) - r
 
 		// fast rotl(13)
-		p32 := xxh.v1 + (uint32(xxh.buf[p+3])<<24|uint32(xxh.buf[p+2])<<16|uint32(xxh.buf[p+1])<<8|uint32(xxh.buf[p]))*prime32_2
-		xxh.v1 = (p32<<13 | p32>>19) * prime32_1
-		p += 4
-		p32 = xxh.v2 + (uint32(xxh.buf[p+3])<<24|uint32(xxh.buf[p+2])<<16|uint32(xxh.buf[p+1])<<8|uint32(xxh.buf[p]))*prime32_2
-		xxh.v2 = (p32<<13 | p32>>19) * prime32_1
-		p += 4
-		p32 = xxh.v3 + (uint32(xxh.buf[p+3])<<24|uint32(xxh.buf[p+2])<<16|uint32(xxh.buf[p+1])<<8|uint32(xxh.buf[p]))*prime32_2
-		xxh.v3 = (p32<<13 | p32>>19) * prime32_1
-		p += 4
-		p32 = xxh.v4 + (uint32(xxh.buf[p+3])<<24|uint32(xxh.buf[p+2])<<16|uint32(xxh.buf[p+1])<<8|uint32(xxh.buf[p]))*prime32_2
-		xxh.v4 = (p32<<13 | p32>>19) * prime32_1
-
+		if littleEndian {
+			ptr := uintptr(unsafe.Pointer(&xxh.buf[p]))
+			p32 := xxh.v1 + *(*uint32)(unsafe.Pointer(ptr))*prime32_2
+			xxh.v1 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v2 + *(*uint32)(unsafe.Pointer(ptr + 4))*prime32_2
+			xxh.v2 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v3 + *(*uint32)(unsafe.Pointer(ptr + 8))*prime32_2
+			xxh.v3 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v4 + *(*uint32)(unsafe.Pointer(ptr + 12))*prime32_2
+			xxh.v4 = (p32<<13 | p32>>19) * prime32_1
+		} else {
+			p32 := xxh.v1 + (uint32(xxh.buf[0+3])<<24|uint32(xxh.buf[0+2])<<16|uint32(xxh.buf[0+1])<<8|uint32(xxh.buf[0]))*prime32_2
+			xxh.v1 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v2 + (uint32(xxh.buf[4+3])<<24|uint32(xxh.buf[4+2])<<16|uint32(xxh.buf[4+1])<<8|uint32(xxh.buf[4]))*prime32_2
+			xxh.v2 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v3 + (uint32(xxh.buf[8+3])<<24|uint32(xxh.buf[8+2])<<16|uint32(xxh.buf[8+1])<<8|uint32(xxh.buf[8]))*prime32_2
+			xxh.v3 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v4 + (uint32(xxh.buf[12+3])<<24|uint32(xxh.buf[12+2])<<16|uint32(xxh.buf[12+1])<<8|uint32(xxh.buf[12]))*prime32_2
+			xxh.v4 = (p32<<13 | p32>>19) * prime32_1
+		}
 		p = r
 		xxh.bufused = 0
 	}
 
-	for n := n - 16; p <= n; {
-		p32 := xxh.v1 + (uint32(input[p+3])<<24|uint32(input[p+2])<<16|uint32(input[p+1])<<8|uint32(input[p]))*prime32_2
-		xxh.v1 = (p32<<13 | p32>>19) * prime32_1
-		p += 4
-		p32 = xxh.v2 + (uint32(input[p+3])<<24|uint32(input[p+2])<<16|uint32(input[p+1])<<8|uint32(input[p]))*prime32_2
-		xxh.v2 = (p32<<13 | p32>>19) * prime32_1
-		p += 4
-		p32 = xxh.v3 + (uint32(input[p+3])<<24|uint32(input[p+2])<<16|uint32(input[p+1])<<8|uint32(input[p]))*prime32_2
-		xxh.v3 = (p32<<13 | p32>>19) * prime32_1
-		p += 4
-		p32 = xxh.v4 + (uint32(input[p+3])<<24|uint32(input[p+2])<<16|uint32(input[p+1])<<8|uint32(input[p]))*prime32_2
-		xxh.v4 = (p32<<13 | p32>>19) * prime32_1
-		p += 4
+	if p > n-16 {
+		// Nothing to do
+	} else if littleEndian {
+		ptr := uintptr(unsafe.Pointer(&input[p]))
+		for ; p <= n-16; p += 16 {
+			p32 := xxh.v1 + *(*uint32)(unsafe.Pointer(ptr))*prime32_2
+			xxh.v1 = (p32<<13 | p32>>19) * prime32_1
+			ptr += 4
+			p32 = xxh.v2 + *(*uint32)(unsafe.Pointer(ptr))*prime32_2
+			xxh.v2 = (p32<<13 | p32>>19) * prime32_1
+			ptr += 4
+			p32 = xxh.v3 + *(*uint32)(unsafe.Pointer(ptr))*prime32_2
+			xxh.v3 = (p32<<13 | p32>>19) * prime32_1
+			ptr += 4
+			p32 = xxh.v4 + *(*uint32)(unsafe.Pointer(ptr))*prime32_2
+			xxh.v4 = (p32<<13 | p32>>19) * prime32_1
+			ptr += 4
+		}
+	} else {
+		for n := n - 16; p <= n; p += 16 {
+			sub := input[p : p+16]
+			p32 := xxh.v1 + (uint32(sub[0+3])<<24|uint32(sub[0+2])<<16|uint32(sub[0+1])<<8|uint32(sub[0]))*prime32_2
+			xxh.v1 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v2 + (uint32(sub[4+3])<<24|uint32(sub[4+2])<<16|uint32(sub[4+1])<<8|uint32(sub[4]))*prime32_2
+			xxh.v2 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v3 + (uint32(sub[8+3])<<24|uint32(sub[8+2])<<16|uint32(sub[8+1])<<8|uint32(sub[8]))*prime32_2
+			xxh.v3 = (p32<<13 | p32>>19) * prime32_1
+			p32 = xxh.v4 + (uint32(sub[12+3])<<24|uint32(sub[12+2])<<16|uint32(sub[12+1])<<8|uint32(sub[12]))*prime32_2
+			xxh.v4 = (p32<<13 | p32>>19) * prime32_1
+		}
 	}
 
 	copy(xxh.buf[xxh.bufused:], input[p:])
@@ -128,15 +168,30 @@ func (xxh *xxHash) Sum32() uint32 {
 		h32 += xxh.seed + prime32_5
 	}
 
-	p := 0
-	n := xxh.bufused
-	for n := n - 4; p <= n; p += 4 {
-		h32 += (uint32(xxh.buf[p+3])<<24 | uint32(xxh.buf[p+2])<<16 | uint32(xxh.buf[p+1])<<8 | uint32(xxh.buf[p])) * prime32_3
-		h32 = ((h32 << 17) | (h32 >> 15)) * prime32_4
-	}
-	for ; p < n; p++ {
-		h32 += uint32(xxh.buf[p]) * prime32_5
-		h32 = ((h32 << 11) | (h32 >> 21)) * prime32_1
+	if littleEndian {
+		p := 0
+		n := xxh.bufused
+		ptr := uintptr(unsafe.Pointer(&xxh.buf[0]))
+		for n := n - 4; p <= n; p += 4 {
+			h32 += *(*uint32)(unsafe.Pointer(ptr)) * prime32_3
+			h32 = ((h32 << 17) | (h32 >> 15)) * prime32_4
+			ptr += 4
+		}
+		for ; p < n; p++ {
+			h32 += uint32(xxh.buf[p]) * prime32_5
+			h32 = ((h32 << 11) | (h32 >> 21)) * prime32_1
+		}
+	} else {
+		p := 0
+		n := xxh.bufused
+		for n := n - 4; p <= n; p += 4 {
+			h32 += (uint32(xxh.buf[p+3])<<24 | uint32(xxh.buf[p+2])<<16 | uint32(xxh.buf[p+1])<<8 | uint32(xxh.buf[p])) * prime32_3
+			h32 = ((h32 << 17) | (h32 >> 15)) * prime32_4
+		}
+		for ; p < n; p++ {
+			h32 += uint32(xxh.buf[p]) * prime32_5
+			h32 = ((h32 << 11) | (h32 >> 21)) * prime32_1
+		}
 	}
 
 	h32 ^= h32 >> 15
@@ -161,19 +216,36 @@ func Checksum(input []byte, seed uint32) uint32 {
 		v3 := seed
 		v4 := seed - prime32_1
 		p := 0
-		for p <= n-16 {
-			v1 += (uint32(input[p+3])<<24 | uint32(input[p+2])<<16 | uint32(input[p+1])<<8 | uint32(input[p])) * prime32_2
-			v1 = (v1<<13 | v1>>19) * prime32_1
-			p += 4
-			v2 += (uint32(input[p+3])<<24 | uint32(input[p+2])<<16 | uint32(input[p+1])<<8 | uint32(input[p])) * prime32_2
-			v2 = (v2<<13 | v2>>19) * prime32_1
-			p += 4
-			v3 += (uint32(input[p+3])<<24 | uint32(input[p+2])<<16 | uint32(input[p+1])<<8 | uint32(input[p])) * prime32_2
-			v3 = (v3<<13 | v3>>19) * prime32_1
-			p += 4
-			v4 += (uint32(input[p+3])<<24 | uint32(input[p+2])<<16 | uint32(input[p+1])<<8 | uint32(input[p])) * prime32_2
-			v4 = (v4<<13 | v4>>19) * prime32_1
-			p += 4
+		if n < 16 {
+			// Nothing to do
+		} else if littleEndian {
+			ptr := uintptr(unsafe.Pointer(&input[p]))
+			for n := n - 16; p <= n; p += 16 {
+				v1 += *(*uint32)(unsafe.Pointer(ptr)) * prime32_2
+				v1 = (v1<<13 | v1>>19) * prime32_1
+				ptr += 4
+				v2 += *(*uint32)(unsafe.Pointer(ptr)) * prime32_2
+				v2 = (v2<<13 | v2>>19) * prime32_1
+				ptr += 4
+				v3 += *(*uint32)(unsafe.Pointer(ptr)) * prime32_2
+				v3 = (v3<<13 | v3>>19) * prime32_1
+				ptr += 4
+				v4 += *(*uint32)(unsafe.Pointer(ptr)) * prime32_2
+				v4 = (v4<<13 | v4>>19) * prime32_1
+				ptr += 4
+			}
+		} else {
+			for n := n - 16; p <= n; p += 16 {
+				sub := input[p : p+16]
+				v1 += (uint32(sub[3])<<24 | uint32(sub[2])<<16 | uint32(sub[1])<<8 | uint32(sub[0])) * prime32_2
+				v1 = (v1<<13 | v1>>19) * prime32_1
+				v2 += (uint32(sub[4+3])<<24 | uint32(sub[4+2])<<16 | uint32(sub[4+1])<<8 | uint32(sub[4])) * prime32_2
+				v2 = (v2<<13 | v2>>19) * prime32_1
+				v3 += (uint32(sub[8+3])<<24 | uint32(sub[8+2])<<16 | uint32(sub[8+1])<<8 | uint32(sub[8])) * prime32_2
+				v3 = (v3<<13 | v3>>19) * prime32_1
+				v4 += (uint32(sub[12+3])<<24 | uint32(sub[12+2])<<16 | uint32(sub[12+1])<<8 | uint32(sub[12])) * prime32_2
+				v4 = (v4<<13 | v4>>19) * prime32_1
+			}
 		}
 		input = input[p:]
 		n -= p
@@ -183,16 +255,33 @@ func Checksum(input []byte, seed uint32) uint32 {
 			((v4 << 18) | (v4 >> 14))
 	}
 
-	p := 0
-	for p <= n-4 {
-		h32 += (uint32(input[p+3])<<24 | uint32(input[p+2])<<16 | uint32(input[p+1])<<8 | uint32(input[p])) * prime32_3
-		h32 = ((h32 << 17) | (h32 >> 15)) * prime32_4
-		p += 4
-	}
-	for p < n {
-		h32 += uint32(input[p]) * prime32_5
-		h32 = ((h32 << 11) | (h32 >> 21)) * prime32_1
-		p++
+	if n == 0 {
+		// Nothing to do
+	} else if littleEndian {
+		p := 0
+		ptr := uintptr(unsafe.Pointer(&input[0]))
+		for n := n - 4; p <= n; p += 4 {
+			h32 += *(*uint32)(unsafe.Pointer(ptr)) * prime32_3
+			h32 = ((h32 << 17) | (h32 >> 15)) * prime32_4
+			ptr += 4
+		}
+		for p < n {
+			h32 += uint32(input[p]) * prime32_5
+			h32 = ((h32 << 11) | (h32 >> 21)) * prime32_1
+			p++
+		}
+	} else {
+		p := 0
+		for n := n - 4; p <= n; p += 4 {
+			sub := input[p : p+4]
+			h32 += (uint32(sub[3])<<24 | uint32(sub[2])<<16 | uint32(sub[1])<<8 | uint32(sub[0])) * prime32_3
+			h32 = ((h32 << 17) | (h32 >> 15)) * prime32_4
+		}
+		for p < n {
+			h32 += uint32(input[p]) * prime32_5
+			h32 = ((h32 << 11) | (h32 >> 21)) * prime32_1
+			p++
+		}
 	}
 
 	h32 ^= h32 >> 15
