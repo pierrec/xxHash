@@ -158,19 +158,15 @@ func Checksum(input []byte, seed uint32) uint32 {
 		h32 += rol1(v1) + rol7(v2) + rol12(v3) + rol18(v4)
 	}
 
-	if n == 0 {
-		// Nothing to do
-	} else {
-		p := 0
-		for n := n - 4; p <= n; p += 4 {
-			h32 += u32(input[p:p+4]) * prime32_3
-			h32 = rol17(h32) * prime32_4
-		}
-		for p < n {
-			h32 += uint32(input[p]) * prime32_5
-			h32 = rol11(h32) * prime32_1
-			p++
-		}
+	p := 0
+	for n := n - 4; p <= n; p += 4 {
+		h32 += u32(input[p:p+4]) * prime32_3
+		h32 = rol17(h32) * prime32_4
+	}
+	for p < n {
+		h32 += uint32(input[p]) * prime32_5
+		h32 = rol11(h32) * prime32_1
+		p++
 	}
 
 	h32 ^= h32 >> 15

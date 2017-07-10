@@ -124,6 +124,7 @@ func (xxh *xxHash) Sum64() uint64 {
 	} else {
 		h64 = xxh.seed + prime64_5 + xxh.totalLen
 	}
+
 	p := 0
 	n := xxh.bufused
 	for n := n - 8; p <= n; p += 8 {
@@ -189,25 +190,21 @@ func Checksum(input []byte, seed uint64) uint64 {
 		h64 = seed + prime64_5 + uint64(n)
 	}
 
-	if n == 0 {
-		// Nothing to do
-	} else {
-		p := 0
-		for n := n - 8; p <= n; p += 8 {
-			sub := input[p : p+8]
-			h64 ^= rol31(u64(sub)*prime64_2) * prime64_1
-			h64 = rol27(h64)*prime64_1 + prime64_4
-		}
-		if p+4 <= n {
-			sub := input[p : p+4]
-			h64 ^= (uint64(sub[3])<<24 | uint64(sub[2])<<16 | uint64(sub[1])<<8 | uint64(sub[0])) * prime64_1
-			h64 = rol23(h64)*prime64_2 + prime64_3
-			p += 4
-		}
-		for ; p < n; p++ {
-			h64 ^= uint64(input[p]) * prime64_5
-			h64 = rol11(h64) * prime64_1
-		}
+	p := 0
+	for n := n - 8; p <= n; p += 8 {
+		sub := input[p : p+8]
+		h64 ^= rol31(u64(sub)*prime64_2) * prime64_1
+		h64 = rol27(h64)*prime64_1 + prime64_4
+	}
+	if p+4 <= n {
+		sub := input[p : p+4]
+		h64 ^= (uint64(sub[3])<<24 | uint64(sub[2])<<16 | uint64(sub[1])<<8 | uint64(sub[0])) * prime64_1
+		h64 = rol23(h64)*prime64_2 + prime64_3
+		p += 4
+	}
+	for ; p < n; p++ {
+		h64 ^= uint64(input[p]) * prime64_5
+		h64 = rol11(h64) * prime64_1
 	}
 
 	h64 ^= h64 >> 33
