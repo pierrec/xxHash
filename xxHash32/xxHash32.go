@@ -2,10 +2,7 @@
 // (https://github.com/Cyan4973/xxHash/)
 package xxHash32
 
-import (
-	"hash"
-	"unsafe"
-)
+import "hash"
 
 const (
 	prime32_1 = 2654435761
@@ -90,20 +87,16 @@ func (xxh *xxHash) Write(input []byte) (int, error) {
 		xxh.bufused = 0
 	}
 
-	if p > n-16 {
-		// Nothing to do
-	} else {
-		// Pointer arithmetics avoids bounds checking inside the loop
-		ptr := uintptr(unsafe.Pointer(&input[p]))
-		for n := n - 16; p <= n; p += 16 {
-			sub := (*[16]byte)(unsafe.Pointer(ptr))
-			xxh.v1 = rol13(xxh.v1+u32(sub[:])*prime32_2) * prime32_1
-			xxh.v2 = rol13(xxh.v2+u32(sub[4:])*prime32_2) * prime32_1
-			xxh.v3 = rol13(xxh.v3+u32(sub[8:])*prime32_2) * prime32_1
-			xxh.v4 = rol13(xxh.v4+u32(sub[12:])*prime32_2) * prime32_1
-			ptr += 16
-		}
+	// Causes compiler to work directly from registers instead of stack:
+	v1, v2, v3, v4 := xxh.v1, xxh.v2, xxh.v3, xxh.v4
+	for n := n - 16; p <= n; p += 16 {
+		sub := input[p:][:16] //BCE hint for compiler
+		v1 = rol13(v1+u32(sub[:])*prime32_2) * prime32_1
+		v2 = rol13(v2+u32(sub[4:])*prime32_2) * prime32_1
+		v3 = rol13(v3+u32(sub[8:])*prime32_2) * prime32_1
+		v4 = rol13(v4+u32(sub[12:])*prime32_2) * prime32_1
 	}
+	xxh.v1, xxh.v2, xxh.v3, xxh.v4 = v1, v2, v3, v4
 
 	copy(xxh.buf[xxh.bufused:], input[p:])
 	xxh.bufused += len(input) - p
@@ -153,18 +146,12 @@ func Checksum(input []byte, seed uint32) uint32 {
 		v3 := seed
 		v4 := seed - prime32_1
 		p := 0
-		if n < 16 {
-			// Nothing to do
-		} else {
-			ptr := uintptr(unsafe.Pointer(&input[p]))
-			for n := n - 16; p <= n; p += 16 {
-				sub := (*[16]byte)(unsafe.Pointer(ptr))
-				v1 = rol13(v1+u32(sub[:])*prime32_2) * prime32_1
-				v2 = rol13(v2+u32(sub[4:])*prime32_2) * prime32_1
-				v3 = rol13(v3+u32(sub[8:])*prime32_2) * prime32_1
-				v4 = rol13(v4+u32(sub[12:])*prime32_2) * prime32_1
-				ptr += 16
-			}
+		for n := n - 16; p <= n; p += 16 {
+			sub := input[p:][:16] //BCE hint for compiler
+			v1 = rol13(v1+u32(sub[:])*prime32_2) * prime32_1
+			v2 = rol13(v2+u32(sub[4:])*prime32_2) * prime32_1
+			v3 = rol13(v3+u32(sub[8:])*prime32_2) * prime32_1
+			v4 = rol13(v4+u32(sub[12:])*prime32_2) * prime32_1
 		}
 		input = input[p:]
 		n -= p

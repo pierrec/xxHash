@@ -2,10 +2,7 @@
 // (https://github.com/Cyan4973/xxHash/)
 package xxHash64
 
-import (
-	"hash"
-	"unsafe"
-)
+import "hash"
 
 const (
 	prime64_1 = 11400714785074694791
@@ -90,19 +87,16 @@ func (xxh *xxHash) Write(input []byte) (int, error) {
 		xxh.bufused = 0
 	}
 
-	if p > n-32 {
-		// Nothing to do
-	} else {
-		ptr := uintptr(unsafe.Pointer(&input[p]))
-		for n := n - 32; p <= n; p += 32 {
-			sub := (*[32]byte)(unsafe.Pointer(ptr))
-			xxh.v1 = rol31(xxh.v1+u64(sub[:])*prime64_2) * prime64_1
-			xxh.v2 = rol31(xxh.v2+u64(sub[8:])*prime64_2) * prime64_1
-			xxh.v3 = rol31(xxh.v3+u64(sub[16:])*prime64_2) * prime64_1
-			xxh.v4 = rol31(xxh.v4+u64(sub[24:])*prime64_2) * prime64_1
-			ptr += 32
-		}
+	// Causes compiler to work directly from registers instead of stack:
+	v1, v2, v3, v4 := xxh.v1, xxh.v2, xxh.v3, xxh.v4
+	for n := n - 32; p <= n; p += 32 {
+		sub := input[p:][:32] //BCE hint for compiler
+		v1 = rol31(v1+u64(sub[:])*prime64_2) * prime64_1
+		v2 = rol31(v2+u64(sub[8:])*prime64_2) * prime64_1
+		v3 = rol31(v3+u64(sub[16:])*prime64_2) * prime64_1
+		v4 = rol31(v4+u64(sub[24:])*prime64_2) * prime64_1
 	}
+	xxh.v1, xxh.v2, xxh.v3, xxh.v4 = v1, v2, v3, v4
 
 	copy(xxh.buf[xxh.bufused:], input[p:])
 	xxh.bufused += len(input) - p
@@ -167,18 +161,12 @@ func Checksum(input []byte, seed uint64) uint64 {
 		v3 := seed
 		v4 := seed - prime64_1
 		p := 0
-		if n < 32 {
-			// Nothing to do
-		} else {
-			ptr := uintptr(unsafe.Pointer(&input[p]))
-			for n := n - 32; p <= n; p += 32 {
-				sub := (*[32]byte)(unsafe.Pointer(ptr))
-				v1 = rol31(v1+u64(sub[:])*prime64_2) * prime64_1
-				v2 = rol31(v2+u64(sub[8:])*prime64_2) * prime64_1
-				v3 = rol31(v3+u64(sub[16:])*prime64_2) * prime64_1
-				v4 = rol31(v4+u64(sub[24:])*prime64_2) * prime64_1
-				ptr += 32
-			}
+		for n := n - 32; p <= n; p += 32 {
+			sub := input[p:][:32] //BCE hint for compiler
+			v1 = rol31(v1+u64(sub[:])*prime64_2) * prime64_1
+			v2 = rol31(v2+u64(sub[8:])*prime64_2) * prime64_1
+			v3 = rol31(v3+u64(sub[16:])*prime64_2) * prime64_1
+			v4 = rol31(v4+u64(sub[24:])*prime64_2) * prime64_1
 		}
 
 		h64 = rol1(v1) + rol7(v2) + rol12(v3) + rol18(v4)
