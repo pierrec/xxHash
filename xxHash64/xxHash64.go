@@ -133,7 +133,7 @@ func (xxh *xxHash) Sum64() uint64 {
 	}
 	if p+4 <= n {
 		sub := xxh.buf[p : p+4]
-		h64 ^= (uint64(sub[0]) | uint64(sub[1])<<8 | uint64(sub[2])<<16 | uint64(sub[3])<<24) * prime64_1
+		h64 ^= uint64(u32(sub)) * prime64_1
 		h64 = rol23(h64)*prime64_2 + prime64_3
 		p += 4
 	}
@@ -198,7 +198,7 @@ func Checksum(input []byte, seed uint64) uint64 {
 	}
 	if p+4 <= n {
 		sub := input[p : p+4]
-		h64 ^= (uint64(sub[3])<<24 | uint64(sub[2])<<16 | uint64(sub[1])<<8 | uint64(sub[0])) * prime64_1
+		h64 ^= uint64(u32(sub)) * prime64_1
 		h64 = rol23(h64)*prime64_2 + prime64_3
 		p += 4
 	}
@@ -219,6 +219,10 @@ func Checksum(input []byte, seed uint64) uint64 {
 func u64(buf []byte) uint64 {
 	// go compiler recognizes this pattern and optimizes it on little endian platforms
 	return uint64(buf[0]) | uint64(buf[1])<<8 | uint64(buf[2])<<16 | uint64(buf[3])<<24 | uint64(buf[4])<<32 | uint64(buf[5])<<40 | uint64(buf[6])<<48 | uint64(buf[7])<<56
+}
+
+func u32(buf []byte) uint32 {
+	return uint32(buf[0]) | uint32(buf[1])<<8 | uint32(buf[2])<<16 | uint32(buf[3])<<24
 }
 
 func rol1(u uint64) uint64 {
