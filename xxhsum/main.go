@@ -29,6 +29,25 @@ func main() {
 		xxh = xxHash64.New(*seed)
 	}
 
+	print := func(s string) {
+		h := xxh.Sum(nil)
+		n := len(h)
+		j := n - 1
+		for i := 0; i < n/2; {
+			h[i], h[j] = h[j], h[i]
+			i++
+			j--
+		}
+		fmt.Printf("%x %s\n", h, s)
+	}
+
+	if len(flag.Args()) == 0 {
+		if _, err := io.Copy(xxh, os.Stdin); err == nil {
+			print("stdin")
+		}
+		return
+	}
+
 	// Process each file in sequence
 	for _, filename := range flag.Args() {
 		inputFile, err := os.Open(filename)
@@ -36,7 +55,7 @@ func main() {
 			continue
 		}
 		if _, err := io.Copy(xxh, inputFile); err == nil {
-			fmt.Printf("%x %s\n", xxh.Sum(nil), filename)
+			print(filename)
 		}
 		inputFile.Close()
 		xxh.Reset()
