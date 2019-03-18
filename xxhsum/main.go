@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	seed := flag.Uint64("seed", 0, "seed value")
+	seed := flag.Uint64("seed", 0, "uint32 or uint64 `seed` based on the selected mode (default 0)")
 	mode := flag.Int("mode", 1, "hash mode: 0=32bits, 1=64bits")
 	flag.Parse()
 
